@@ -1,12 +1,12 @@
-from http import HTTPStatus
 import os
 import logging
 import sys
 import time
+from http import HTTPStatus
 
-from dotenv import load_dotenv
 import requests
 import telegram
+from dotenv import load_dotenv
 
 from exceptions import EndPointNotAvailableException, APIStatusCodeException
 
@@ -31,8 +31,7 @@ HOMEWORK_VERDICTS = {
 
 def check_tokens():
     """Проверка обязательных переменных окружения."""
-    tokens = (PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID)
-    return all(tokens)
+    return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
 
 
 def send_message(bot, message):
@@ -55,19 +54,13 @@ def get_api_answer(timestamp):
         response = requests.get(ENDPOINT, headers=HEADERS,
                                 params={'from_date': timestamp})
     except requests.RequestException as error:
-        logging.error(f'Эндпоинт {ENDPOINT} недоступен: "{error}"')
-        raise EndPointNotAvailableException(
-            f'Эндпоинт {ENDPOINT} недоступен: "{error}"'
-        )
+        error_msg = f'Эндпоинт {ENDPOINT} недоступен: "{error}"'
+        logging.error(error_msg)
+        raise EndPointNotAvailableException(error_msg)
     if response.status_code != HTTPStatus.OK:
-        logging.error(
-            f'Эндпоинт {ENDPOINT} вернул статус'
-            f'{response.status_code}'
-        )
-        raise APIStatusCodeException(
-            f'Эндпоинт {ENDPOINT} вернул статус'
-            f'{response.status_code}'
-        )
+        error_msg = f'Эндпоинт {ENDPOINT} вернул статус {response.status_code}'
+        logging.error(error_msg)
+        raise APIStatusCodeException(error_msg)
     return response.json()
 
 
@@ -75,35 +68,35 @@ def check_response(response):
     """Проверка ответа API."""
     logging.debug('Начало проверки ответа API')
     if not isinstance(response, dict):
-        logging.error('Ответ API имеет неверный тип')
-        raise TypeError("Ответ API имеет неверный тип")
-    if not ('homeworks' in response and "current_date" in response):
-        logging.error('В ответе API отсутствуют ключи homeworks '
-                      'или current_date')
-        raise KeyError('В ответе API отсутствуют ключи homeworks '
-                       'или current_date')
+        error_msg = 'Ответ API имеет неверный тип'
+        logging.error(error_msg)
+        raise TypeError(error_msg)
+    for key in ('homeworks', "current_date"):
+        if key not in response:
+            error_msg = f'В ответе API отсутствует ключ {key}'
+            logging.error(error_msg)
+            raise KeyError(error_msg)
     if not isinstance(response['homeworks'], list):
-        logging.error("Домашние работы в ответе API имеют неверный тип")
-        raise TypeError("Домашние работы в ответе API имеют неверный тип")
+        error_msg = "Домашние работы в ответе API имеют неверный тип"
+        logging.error(error_msg)
+        raise TypeError(error_msg)
 
 
 def parse_status(homework):
     """Получение статуса домашней работы."""
     logging.debug('Начало получения статуса домашней работы')
-    status = homework.get('status')
-    if not status:
-        logging.error('Статус домашней работы отсутствует')
-        raise KeyError
-    homework_name = homework.get('homework_name')
-    if not homework_name:
-        logging.error('Домашняя работа не имеет имени')
-        raise KeyError
-    verdict = HOMEWORK_VERDICTS.get(status)
-    if not verdict:
-        logging.error(
-            f'Передан неизвестный статус домашней работы "{verdict}"'
-        )
-        raise KeyError
+    for key in ('status', 'homework_name'):
+        if key not in homework:
+            error_msg = f'В словаре homework отсутствует ключ {key}'
+            logging.error(error_msg)
+            raise KeyError(error_msg)
+    status = homework['status']
+    homework_name = homework['homework_name']
+    if status not in HOMEWORK_VERDICTS:
+        error_msg = f'Передан неизвестный статус домашней работы "{status}"'
+        logging.error(error_msg)
+        raise KeyError(error_msg)
+    verdict = HOMEWORK_VERDICTS[status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
@@ -124,7 +117,7 @@ def main():
             if not homeworks:
                 logging.debug('Новых статусов не найдено')
             else:
-                homework_status = parse_status(homeworks[0])
+                homework_status = parse_status(*homeworks)
                 send_message(bot, homework_status)
                 timestamp = int(time.time())
         except Exception as error:
