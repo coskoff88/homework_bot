@@ -117,7 +117,8 @@ def main():
             if not homeworks:
                 logging.debug('Новых статусов не найдено')
             else:
-                homework_status = parse_status(*homeworks)
+                homework, *_ = response.get('homeworks')
+                homework_status = parse_status(homework)
                 send_message(bot, homework_status)
                 timestamp = int(time.time())
         except Exception as error:
